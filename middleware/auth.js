@@ -1,71 +1,70 @@
-// middleware/auth.js - Authentication middleware
+// middleware/auth.js - UPDATED VERSION
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 
-// Protect routes - verify JWT token
 const protect = async (req, res, next) => {
   try {
     let token;
-
-    // Check if token exists in header
+    
+    // Get token from header
     if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
       token = req.headers.authorization.split(' ')[1];
-    } else if (req.headers.authorization) {
-      // If no 'Bearer' prefix, use the whole authorization header
-      token = req.headers.authorization;
+    } else if (req.cookies?.token) {
+      token = req.cookies.token;
     }
-
-    console.log('🔐 Token received:', token ? 'Yes' : 'No');
-
+    
     if (!token) {
-      console.log('❌ No token provided');
       return res.status(401).json({
         success: false,
-        message: 'Access denied. No token provided.'
+        message: 'Please login to access this resource'
       });
     }
-
+    
     // Verify token
-    try {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      console.log('✅ Token verified for user:', decoded.id);
-
-      // Check if user still exists
-      const currentUser = await User.findById(decoded.id);
-      if (!currentUser) {
-        console.log('❌ User not found for token');
-        return res.status(401).json({
-          success: false,
-          message: 'User belonging to this token no longer exists.'
-        });
-      }
-
-      // Check if user changed password after token was issued
-      if (currentUser.changedPasswordAfter(decoded.iat)) {
-        console.log('❌ Password changed after token issued');
-        return res.status(401).json({
-          success: false,
-          message: 'User recently changed password. Please log in again.'
-        });
-      }
-
-      // Grant access to protected route
-      req.user = currentUser;
-      console.log('✅ Access granted to:', currentUser.name);
-      next();
-    } catch (jwtError) {
-      console.log('❌ JWT verification failed:', jwtError.message);
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    
+    // Find user
+    const user = await User.findById(decoded.id);
+    
+    if (!user) {
       return res.status(401).json({
         success: false,
-        message: 'Invalid token or token expired.'
+        message: 'User no longer exists'
       });
     }
-
+    
+    // Check if user changed password after token was issued
+    if (user.changedPasswordAfter && user.changedPasswordAfter(decoded.iat)) {
+      return res.status(401).json({
+        success: false,
+        message: 'Password recently changed. Please login again.'
+      });
+    }
+    
+    // Attach user to request
+    req.user = user;
+    next();
+    
   } catch (error) {
-    console.error('🚨 Auth middleware error:', error);
+    console.error('Auth error:', error.message);
+    
+    if (error.name === 'JsonWebTokenError') {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid token. Please login again.'
+      });
+    }
+    
+    if (error.name === 'TokenExpiredError') {
+      return res.status(401).json({
+        success: false,
+        message: 'Token expired. Please login again.'
+      });
+    }
+    
     return res.status(401).json({
       success: false,
-      message: 'Authentication failed.'
+      message: 'Authentication failed'
     });
   }
 };
@@ -76,41 +75,26 @@ const restrictTo = (...roles) => {
     if (!roles.includes(req.user.role)) {
       return res.status(403).json({
         success: false,
-        message: 'You do not have permission to perform this action.'
+        message: `You don't have permission to perform this action. Required roles: ${roles.join(', ')}`
       });
     }
     next();
   };
 };
 
-// Check if user is logged in (optional)
-const optionalAuth = async (req, res, next) => {
-  try {
-    let token;
-
-    if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
-      token = req.headers.authorization.split(' ')[1];
-      
-      try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        const currentUser = await User.findById(decoded.id);
-        
-        if (currentUser && !currentUser.changedPasswordAfter(decoded.iat)) {
-          req.user = currentUser;
-        }
-      } catch (jwtError) {
-        // Token invalid, but continue without user
-        console.log('Optional auth - invalid token:', jwtError.message);
-      }
-    }
-    next();
-  } catch (error) {
-    next();
+// Admin only middleware
+const adminOnly = (req, res, next) => {
+  if (req.user.role !== 'admin') {
+    return res.status(403).json({
+      success: false,
+      message: 'Admin access only'
+    });
   }
+  next();
 };
 
 module.exports = {
   protect,
   restrictTo,
-  optionalAuth
+  adminOnly
 };
