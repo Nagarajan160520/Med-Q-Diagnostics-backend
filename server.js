@@ -9,7 +9,7 @@ const app = express();
 
 // Middleware
 app.use(cors({
-  origin: ['http://localhost:3000', 'http://localhost:3001', 'https://med-q-diagnostics-frontend-1.onrender.com'],
+  origin:  'https://med-q-diagnostics-frontend-1.onrender.com',
   credentials: true
 }));
 app.use(express.json());
