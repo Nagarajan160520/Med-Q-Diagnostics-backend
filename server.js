@@ -1,30 +1,46 @@
-// server.js - COMPLETE FIXED VERSION
+// server.js - Lines 8-22 REPLACE with:
+
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const path = require('path');
+const https = require('https'); // ⭐ CHANGE: http → https
 require('dotenv').config();
 
 const app = express();
 
+// ==================== SELF-PING (PREVENT SLEEP) ====================
+const SELF_PING_URL = 'https://med-q-diagnostics-backend.onrender.com';
+const selfPing = () => {
+  https.get(`${SELF_PING_URL}/api/health`, (res) => { // ⭐ https.get
+    console.log('✅ Self-ping successful:', new Date().toLocaleTimeString('en-IN'), 
+                '- Status:', res.statusCode);
+  }).on('error', (err) => {
+    console.log('❌ Self-ping failed:', err.message);
+  });
+};
+
+// Start self-ping every 14 minutes
+setInterval(selfPing, 14 * 60 * 1000);
+selfPing(); // Initial ping
+console.log('🔄 Self-ping activated to prevent Render sleep');
+// ==================== END SELF-PING ====================
+
 // ==================== CORS CONFIGURATION ====================
-// ✅ FIX 1: Correct CORS settings
 const allowedOrigins = [
-  'https://advanced-lab-diagnostic.vercel.app', // Your main website
-  'https://med-q-admin.vercel.app',             // Your admin panel
-  'http://localhost:3000',                      // Local development
-  'http://localhost:3001'                       // Alternative local port
+  'https://advanced-lab-diagnostic.vercel.app',
+  'https://med-q-admin.vercel.app',
+  'http://localhost:3000',
+  'http://localhost:3001'
 ];
 
 app.use(cors({
   origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
     
     if (allowedOrigins.indexOf(origin) === -1) {
-      const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
       console.log('❌ CORS Blocked:', origin);
-      return callback(new Error(msg), false);
+      return callback(new Error('CORS policy blocks this origin'), false);
     }
     
     console.log('✅ CORS Allowed:', origin);
@@ -41,13 +57,13 @@ app.use(cors({
     'Origin'
   ],
   exposedHeaders: ['Content-Length', 'Authorization', 'x-auth-token'],
-  maxAge: 86400 // 24 hours
+  maxAge: 86400
 }));
 
 // Handle preflight requests
 app.options('*', cors());
 
-// ✅ FIX 2: Add CORS headers manually (extra safety)
+// Add CORS headers manually (extra safety)
 app.use((req, res, next) => {
   const origin = req.headers.origin;
   
@@ -122,14 +138,12 @@ app.use('/api/profile', profileRoutes);
 app.use('/api/settings', settingsRoutes);
 
 // ==================== SPECIAL ENDPOINTS ====================
-// Quick admin login (if separate route needed)
 app.post('/api/admin/login', async (req, res) => {
   try {
     const { email, password } = req.body;
     
     console.log('🔄 Admin login attempt:', email);
     
-    // For testing - allow all domains
     res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
     
     const User = require('./models/User');
@@ -195,7 +209,8 @@ app.get('/api/health', (req, res) => {
     uptime: process.uptime(),
     database: mongoose.connection.readyState === 1 ? 'Connected' : 'Disconnected',
     allowedOrigins: allowedOrigins,
-    corsEnabled: true
+    corsEnabled: true,
+    selfPing: 'Active (every 14 minutes)'
   });
 });
 
@@ -236,7 +251,8 @@ app.get('/', (req, res) => {
     cors: {
       enabled: true,
       allowedOrigins: allowedOrigins
-    }
+    },
+    keepAlive: 'Self-ping active (prevents Render sleep)'
   });
 });
 
@@ -255,7 +271,6 @@ app.use('*', (req, res) => {
 app.use((error, req, res, next) => {
   console.error('🚨 Server Error:', error);
   
-  // Add CORS headers even on errors
   res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
   
   res.status(500).json({ 
@@ -270,7 +285,7 @@ const PORT = process.env.PORT || 8000;
 app.listen(PORT, () => {
   console.log(`=========================================`);
   console.log(`🚀 Server running on port ${PORT}`);
-  console.log(`🌐 Backend URL: https://med-q-diagnostics-backend-1.onrender.com`);
+  console.log(`🌐 Backend URL: https://med-q-diagnostics-backend.onrender.com`);
   console.log(`🔗 Frontend URL: https://advanced-lab-diagnostic.vercel.app`);
   console.log(`🔗 Admin Panel: https://med-q-admin.vercel.app`);
   console.log(`👤 User Login: POST /api/auth/login`);
@@ -278,5 +293,6 @@ app.listen(PORT, () => {
   console.log(`🔑 Admin Login: POST /api/admin/login`);
   console.log(`❤️  Health Check: /api/health`);
   console.log(`✅ CORS Enabled for: ${allowedOrigins.join(', ')}`);
+  console.log(`🔄 Self-ping active: Prevents Render sleep (every 14 minutes)`);
   console.log(`=========================================`);
 });
