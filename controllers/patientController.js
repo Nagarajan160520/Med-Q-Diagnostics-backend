@@ -91,9 +91,11 @@ exports.getPatient = async (req, res) => {
 
 // @desc    Create new patient
 // @route   POST /api/patients
-// @access  Public (for registration)
+// @access  Private/Public
 exports.createPatient = async (req, res) => {
   try {
+    console.log('🎯 Received patient data:', req.body);
+    
     const {
       name,
       email,
@@ -104,44 +106,72 @@ exports.createPatient = async (req, res) => {
       bloodGroup
     } = req.body;
 
-    console.log('🎯 Patient creation request:', { name, email, phone, age, gender });
+    // Validate required fields
+    if (!name || !email || !phone || !age || !gender) {
+      console.log('❌ Missing required fields');
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide all required fields: name, email, phone, age, gender'
+      });
+    }
 
-    // Check if patient already exists
+    // Check if patient already exists (optional - you can remove if not needed)
     const existingPatient = await Patient.findOne({ 
       $or: [{ email }, { phone }] 
     });
 
     if (existingPatient) {
+      console.log('❌ Patient already exists:', existingPatient._id);
       return res.status(400).json({
         success: false,
         message: 'Patient with this email or phone already exists'
       });
     }
 
-    // ✅ Create patient without user field
-    const patient = await Patient.create({
-      name,
-      email,
-      phone,
-      age,
-      gender,
-      address,
-      bloodGroup
-      // Don't include user field
-    });
+    // Create patient with the exact fields matching your schema
+    const patientData = {
+      name: name.trim(),
+      email: email.trim().toLowerCase(),
+      phone: phone.trim(),
+      age: parseInt(age),
+      gender: gender,
+      bloodGroup: bloodGroup || '',  // Optional field
+      address: address || ''  // Optional field
+    };
+
+    console.log('📝 Creating patient with data:', patientData);
+
+    const patient = await Patient.create(patientData);
 
     console.log('✅ Patient created successfully:', patient._id);
 
     res.status(201).json({
       success: true,
-      message: 'Patient registered successfully',
-      data: {
-        patient
-      }
+      message: 'Patient created successfully',
+      data: patient  // Send the created patient back
     });
 
   } catch (error) {
     console.error('💥 Patient creation error:', error);
+    
+    // Handle Mongoose validation errors
+    if (error.name === 'ValidationError') {
+      return res.status(400).json({
+        success: false,
+        message: 'Validation error',
+        error: error.message
+      });
+    }
+
+    // Handle duplicate key error
+    if (error.code === 11000) {
+      return res.status(400).json({
+        success: false,
+        message: 'Duplicate field value. Patient with this email or phone already exists.',
+        error: error.keyValue
+      });
+    }
+
     res.status(500).json({
       success: false,
       message: 'Error creating patient',
