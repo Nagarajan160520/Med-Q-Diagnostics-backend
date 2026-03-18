@@ -28,7 +28,7 @@ console.log('🔄 Self-ping activated to prevent Render sleep');
 
 // ==================== CORS CONFIGURATION ====================
 const allowedOrigins = [
-  'https://advanced-lab-diagnostic.vercel.app',
+  'https://medqlabs.com',
   'https://med-q-admin.vercel.app',
   'http://localhost:3000',
   'http://localhost:3001'
@@ -232,7 +232,7 @@ app.get('/', (req, res) => {
     adminLogin: 'POST /api/admin/login',
     userLogin: 'POST /api/auth/login',
     userRegister: 'POST /api/auth/register',
-    frontendURL: 'https://advanced-lab-diagnostic.vercel.app',
+    frontendURL: 'https://medqlabs.com',
     adminURL: 'https://med-q-admin.vercel.app',
     endpoints: {
       adminAuth: '/api/admin/auth',
@@ -286,7 +286,7 @@ app.listen(PORT, () => {
   console.log(`=========================================`);
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`🌐 Backend URL: https://med-q-diagnostics-backend.onrender.com`);
-  console.log(`🔗 Frontend URL: https://advanced-lab-diagnostic.vercel.app`);
+  console.log(`🔗 Frontend URL: https://medqlabs.com`);
   console.log(`🔗 Admin Panel: https://med-q-admin.vercel.app`);
   console.log(`👤 User Login: POST /api/auth/login`);
   console.log(`👤 User Register: POST /api/auth/register`);
